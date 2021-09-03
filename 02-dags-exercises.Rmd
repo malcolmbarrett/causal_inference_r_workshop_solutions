@@ -22,12 +22,12 @@ Stretch goal: Underneath the hood, `ggdag()` calls `tidy_dagitty()` on `dagitty`
 Stretch goal: We are assuming that coffee does *not* cause lung cancer. In causal diagram terminology, we want to know if these two factors are *D-connected* (as in, directionally connected). Since we are assuming that there's no causal relationship, any D-connection is caused by other factors. Try `ggdag_dconnected()` to see if we coffee and lung cancer are D-connected.
 
 ```{r}
-coffee_cancer_dag <- ______(
-  ______ ~ ______,
+coffee_cancer_dag <- dagify(
+  cancer ~ smoking,
   smoking ~ addictive,
   coffee ~ addictive,
-  exposure = "______",
-  outcome = "______",
+  exposure = "coffee",
+  outcome = "cancer",
   labels = c(
     "coffee" = "Coffee", 
     "cancer" = "Lung Cancer", 
@@ -36,8 +36,13 @@ coffee_cancer_dag <- ______(
   )
 )
 
-______(coffee_cancer_dag)
+ggdag(coffee_cancer_dag)
 ```
+
+```{r}
+ggdag_dconnected(coffee_cancer_dag)
+```
+
 
 ## Your Turn 2
 
@@ -52,12 +57,16 @@ Stretch goal: The variable names are a little hard to read. We specified some la
 
 ```{r}
 coffee_cancer_dag %>% 
-  ______() %>% 
-  ______()
+  tidy_dagitty() %>% 
+  dag_paths()
 
-______
+ggdag_paths(coffee_cancer_dag)
 ```
 
+```{r}
+ggdag_paths(coffee_cancer_dag, use_labels = "label", text = FALSE) + 
+  theme_dag()
+```
 
 ## Your Turn 3
 
@@ -69,11 +78,52 @@ Now that we know the open, confounding pathways (sometimes called "backdoor path
 Stretch goal: Sometimes, we know a variable plays a vital role in a causal diagram but we can't measure it, or we simply don't have it in our data set. You can tell {ggdag} that a variable is unmeasured with the `latent` argument in `dagify()`. Re-run the `dagify()` call above, but set `latent = "addictive"` (meaning we can't or haven't measured this variable). Plot it with `ggdag_adjustment_set()`. What's different? Now, try setting `latent = c("addictive", "smoking")` and plotting the adjustment set. What do the results mean?
 
 ```{r}
-______(______)
+ggdag_adjustment_set(coffee_cancer_dag, use_labels = "label", text = FALSE)
 
-cancer ~ ______
-cancer ~ ______
+cancer ~ addictive
+cancer ~ smoking
 ```
+
+```{r}
+coffee_cancer_dag2 <- dagify(
+  cancer ~ smoking,
+  smoking ~ addictive,
+  coffee ~ addictive,
+  exposure = "coffee",
+  outcome = "cancer",
+  # `addictive` is unmeasured in our data
+  latent = "addictive",
+  labels = c(
+    "coffee" = "Coffee", 
+    "cancer" = "Lung Cancer", 
+    "smoking" = "Smoking", 
+    "addictive" = "Addictive \nBehavior"
+  )
+)
+
+ggdag_adjustment_set(coffee_cancer_dag2)
+```
+
+```{r}
+coffee_cancer_dag3 <- dagify(
+  cancer ~ smoking,
+  smoking ~ addictive,
+  coffee ~ addictive,
+  exposure = "coffee",
+  outcome = "cancer",
+  # `addictive` and `smoking` are unmeasured in our data
+  latent = c("smoking", "addictive"),
+  labels = c(
+    "coffee" = "Coffee", 
+    "cancer" = "Lung Cancer", 
+    "smoking" = "Smoking", 
+    "addictive" = "Addictive \nBehavior"
+  )
+)
+
+ggdag_adjustment_set(coffee_cancer_dag3)
+```
+
 
 # Take aways
 
