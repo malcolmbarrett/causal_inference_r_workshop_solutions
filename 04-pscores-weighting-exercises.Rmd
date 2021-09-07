@@ -14,7 +14,7 @@ Using the National Health and Nutrition Examination Survey Data (`nhefs_complete
 
 Below is the propensity score model you created in the previous exercise.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 propensity_model <- glm(
   qsmk ~ age + sex + wt71 + smokeyrs,
   data = nhefs_complete,
@@ -31,14 +31,14 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 
 Create at "matched" data set using the same propensity score model as above and a caliper of 0.2.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 library(MatchIt)
-m <- matchit(___,
+m <- matchit(qsmk ~ age + sex + wt71 + smokeyrs,
         data = nhefs_complete,
-        ___,
-        ___
+        link = "linear.logit",
+        caliper = 0.2
         )
-matched_df <- ___(m)
+matched_df <- get_matches(m, id = "i")
 ```
 
 
@@ -49,9 +49,9 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 
 Add the ATE weights to the data frame, `df`
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 df <- df %>%
-  mutate(w_ate = ___)
+  mutate(w_ate = (qsmk / .fitted) + ((1 - qsmk) / (1 - .fitted)))
 ```
 
 
@@ -59,27 +59,28 @@ Stretch Goal 1:
 
 Add ATM weights to the data frame, `df`
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 df <- df %>%
-  mutate(w_atm = ___)
+  mutate(w_atm = pmin(.fitted, 1 - .fitted) / 
+           (qsmk * .fitted + (1 - qsmk) * (1 - .fitted)))
 ```
 
 Stretch Goal 2: 
 
 Update the code below to examine the distribution of the weighted sample. **HINT** the part that needs to be updated is the `weight` parameter in two of the `geom_histogram()` calls.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 d <- df %>%
   tidyr::spread(qsmk, .fitted, sep = "_p")
 ```
 
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 ggplot(d) +
   geom_histogram(bins = 50, aes(qsmk_p1), alpha = 0.5) + 
-  geom_histogram(bins = 50, aes(qsmk_p1, weight = ____), fill = "green", alpha = 0.5) + 
+  geom_histogram(bins = 50, aes(qsmk_p1, weight = w_ate), fill = "green", alpha = 0.5) + 
   geom_histogram(bins = 50, alpha = 0.5, aes(x = qsmk_p0, y = -..count..)) + 
-  geom_histogram(bins = 50, aes(x = qsmk_p0, weight = ____, y = -..count..), fill = "blue", alpha = 0.5) + 
+  geom_histogram(bins = 50, aes(x = qsmk_p0, weight = w_ate, y = -..count..), fill = "blue", alpha = 0.5) + 
   ylab("count") + xlab("p") +
   geom_hline(yintercept = 0, lwd = 0.5) +
   scale_y_continuous(label = abs) +
@@ -87,4 +88,5 @@ ggplot(d) +
   geom_rect(aes(xmin = 0.95, xmax = 1, ymin = 5, ymax = 100), fill = "#5DB854") + 
   geom_text(aes(x = 0.975, y = 50), label = "trt", angle = 270, color = "white") + 
   geom_rect(aes(xmin = 0.95, xmax = 1, ymin = -100, ymax = -5), fill = "#5154B8") + 
-  geom_text(aes(x = 0.975, y = -50), label = "control", angle = 270, color = "white") 
+  geom_text(aes(x = 0.975, y = -50), label = "control", angle = 270, color = "white")
+```

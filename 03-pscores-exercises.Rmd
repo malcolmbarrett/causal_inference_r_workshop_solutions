@@ -58,19 +58,19 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 
 Fit a propensity score model for `qsmk` using the above proposed confounders.
 
-```{r, eval = FALSE}
-propensity_model <- ___(
-  ___ ~ ___,
+```{r, eval = TRUE}
+propensity_model <- glm(
+  qsmk ~ age + smokeyrs + sex + wt71,
   data = nhefs_complete,
-  family = _____
+  family = binomial()
 )
 ```
 
 Add the propensity scores to the `nhefs_complete` data set, call this new dataset `df`.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 df <- propensity_model %>%
-  ____(type.predict = ____, data = ____)
+  augment(type.predict = "response", data = nhefs_complete)
 ```
 
 
@@ -79,6 +79,9 @@ Stretch Goal 1:
 Examine two histograms of the propensity scores, one for those that quit smoking (`qsmk == 1`) and one for those that did not (`qsmk == 0`). How do these compare?
 
 ```{r}
-
+ggplot(df, aes(x = .fitted, group = qsmk, fill = factor(qsmk))) +
+  geom_histogram(bins = 30) + 
+  labs(x = "Propensity Score",
+       fill = "Quit Smoking (0 = No, 1 = Yes)")
 ```
 

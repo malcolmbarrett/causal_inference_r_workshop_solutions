@@ -21,33 +21,41 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 
 Create a function called `ipw_fit` that fits the propensity score model from Exercise 03, incorporates the ATE weights calculated in Exercise 04, and fits a weighted outcome model.
 
-```{r, eval = FALSE}
-it_ipw <- function(split, ...) { 
-  .df <-____
+```{r, eval = TRUE}
+fit_ipw <- function(split, ...) { 
+  .df <- analysis(split)
   
   # fit propensity score model
-  
+  propensity_model <- glm(
+    qsmk ~ age + sex + wt71 + smokeyrs,
+    data = .df,
+    family = binomial()
+  )
   # calculate ATE weights
-
+  
+  df <- propensity_model %>%
+  augment(type.predict = "response", data = .df) %>%
+  mutate(w_ate = 1 / ifelse(qsmk == 0, 1 - .fitted, .fitted))
+  
   # fit correctly bootsrapped ipw model 
-  lm(___ ~ ___, data = .df, weights = ___) %>% 
+  lm(wt82_71 ~ qsmk, data = df, weights = w_ate) %>% 
     tidy() 
 }
 ```
 
 Bootstrap this result 1000 times.
 
-```{r, eval = FALSE}
-ipw_results <- ____(___, 1000, apparent = TRUE) %>% 
-  mutate(results = map(splits, _____)) 
+```{r, eval = TRUE}
+ipw_results <- bootstraps(nhefs_complete, 1000, apparent = TRUE) %>% 
+  mutate(results = map(splits, fit_ipw)) 
 ```
 
 
 Calculate the confidence interval
 
-```{r, eval = FALSE}
-boot_estimate <- ____(____, ____) %>% 
-  filter(term == ____)
+```{r, eval = TRUE}
+boot_estimate <- int_t(ipw_results, results) %>%
+  filter(term == "qsmk")
 ```
 
 

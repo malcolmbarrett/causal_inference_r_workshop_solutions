@@ -16,7 +16,7 @@ Using the National Health and Nutrition Examination Survey Data (`nhefs_complete
 
 Below is the propensity score model and weights you created in the previous exercise.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 propensity_model <- glm(
   qsmk ~ age + sex + wt71 + smokeyrs,
   data = nhefs_complete,
@@ -34,49 +34,49 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 
 Create the survey design object to incorporate the weights.
 
-```{r, eval = FALSE}
-svy_des <- ____(
+```{r, eval = TRUE}
+svy_des <- svydesign(
   ids = ~ 1,
-  data = ___,
-  weights = ___
+  data = df,
+  weights = ~ w_ate
 )
 ```
 
 Create the **unweighted** standardized mean differences data frame
 
-```{r, eval = FALSE}
-smd_table_unweighted <- ____(
-  vars = _____,
-  strata = _____,
-  data = ____,
+```{r, eval = TRUE}
+smd_table_unweighted <- CreateTableOne(
+  vars = c("age", "sex", "wt71", "smokeyrs"),
+  strata = "qsmk",
+  data = df,
   test = FALSE)
 ```
 
 Create the **weighted** standardized mean differences data frame
 
-```{r, eval = FALSE}
-smd_table <- ____(
-  vars = _____,
-  strata = _____,
-  data = ____,
+```{r, eval = TRUE}
+smd_table <- svyCreateTableOne(
+  vars = c("age", "sex", "wt71", "smokeyrs"),
+  strata = "qsmk",
+  data = svy_des,
   test = FALSE)
 ```
 
 Create a data frame that merges `smd_table_unweighted` and `smd_table` and pivots it to prepare for plotting
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 plot_df <- data.frame(
-  var = rownames(____),                        
-  Unadjusted = _____,                      
-  Weighted = _____) %>%
+  var = rownames(ExtractSmd(smd_table_unweighted)),                        
+  Unadjusted = as.numeric(ExtractSmd(smd_table_unweighted)),                      
+  Weighted = as.numeric(ExtractSmd(smd_table))) %>%
   pivot_longer(-var, names_to = "Method", values_to = "SMD")
 ```
 
 Create the Love Plot using ggplot
 
-```{r, eval = FALSE}
-ggplot(data = _____, 
-       mapping = aes(x = ____, y = ____, group = ____, color = ____)) +
+```{r, eval = TRUE}
+ggplot(data = plot_df, 
+       mapping = aes(x = var, y = SMD, group = Method, color = Method)) +
   geom_line() +
   geom_point() + 
   geom_hline(yintercept = 0.1, color = "black", size = 0.1) +  
@@ -89,33 +89,33 @@ ggplot(data = _____,
 
 Create an unweighted ECDF for `smokeyrs` by those who quit smoking and those who did not.
 
-```{r, eval = FALSE}
-ggplot(df, aes(x = ____, group = ____, color = factor(____))) +
-  ____() +
+```{r, eval = TRUE}
+ggplot(df, aes(x = smokeyrs, group = qsmk, color = factor(qsmk))) +
+  stat_ecdf() +
   scale_color_manual("Quit smoking", values = c("#5154B8", "#5DB854"),
                      labels = c("Yes", "No")) + 
-  xlab(____) + 
+  xlab("Smoking Years") + 
   ylab("Proportion <= x") 
 ```
 
 
 Create an weighted ECDF for `smokeyrs` by those who quit smoking and those who did not.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 ecdf_1 <- df %>%
-  filter(____) %>%
-  arrange(____) %>%
+  filter(qsmk == 1) %>%
+  arrange(smokeyrs) %>%
   mutate(cum_pct = cumsum(w_ate) / sum(w_ate))
 
 ecdf_0 <- df %>%
-  filter(____) %>%
-  arrange(____) %>%
+  filter(qsmk == 0) %>%
+  arrange(smokeyrs) %>%
   mutate(cum_pct = cumsum(w_ate) / sum(w_ate))
 
-ggplot(ecdf_1, aes(x = _____, y = cum_pct)) +
+ggplot(ecdf_1, aes(x = smokeyrs, y = cum_pct)) +
   geom_line(color = "#5DB854") +
-  geom_line(data = ecdf_0, aes(x = ____, y = cum_pct), color = "#5154B8") + 
-  xlab(____) + 
+  geom_line(data = ecdf_0, aes(x = smokeyrs, y = cum_pct), color = "#5154B8") + 
+  xlab("Smoking Years") + 
   ylab("Proportion <= x") 
 ```
 
