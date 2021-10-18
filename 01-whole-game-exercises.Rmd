@@ -8,10 +8,7 @@ library(tidyverse)
 library(broom)
 library(rsample)
 library(ggdag)
-# remotes::install_github("malcolmbarrett/cidata")
-library(cidata)
-library(survey)
-library(tableone)
+library(causaldata)
 ```
 
 ## Causal Modeling: Whole Game
@@ -20,7 +17,7 @@ In this guided exercise, we'll attempt to answer a causal question: does quittin
 
 To answer this question, we'll use causal inference methods to examine the relationship between quitting smoking and gaining weight. First, we'll draw our assumptions with a causal diagram (a directed acyclic graph, or DAG), which will guide our model. Then, we'll use a modeling approach called inverse probability weighting--one of many causal modeling techniques--to estimate the causal effect we're interested in.
 
-We'll use data from NHEFS to try to estimate the causal effect of quitting smoking on weight game. NHEFS is a longitudinal, observational study that has many of the variables we'll need. Take a look at `nhefs_codebook` if you want to know more about the variables in this data set. These data are included in the {cidata} package. We'll use the `nhefs_complete` data set, but we'll remove people who were lost to follow-up.
+We'll use data from NHEFS to try to estimate the causal effect of quitting smoking on weight game. NHEFS is a longitudinal, observational study that has many of the variables we'll need. Take a look at `nhefs_codebook` if you want to know more about the variables in this data set. These data are included in the {causaldata} package. We'll use the `nhefs_complete` data set, but we'll remove people who were lost to follow-up.
 
 ```{r}
 nhefs_complete_uc <- nhefs_complete %>% 
@@ -195,45 +192,39 @@ The main goal here is to *break* the non-causal associations between quitting sm
 
 Standardized mean differences (SMD) are a simple measurement of differences that work across variable types. In general, the closer to 0 we are, the better job we have done eliminating the non-causal relationships we drew in our DAG. Note that low SMDs for everything we adjust for does *not* mean that there is not something else that might confound our study. Unmeasured confounders or misspecified DAGs can still distort our effects, even if our SMDs look great!
 
-We'll use the {survey} and {tableone} package to calculate the SMDs, then visualize them.
+We'll use the {smd}t package to calculate the SMDs, then visualize them.
 
 ```{r}
-svy_des <- svydesign(
-  ids = ~ 1,
-  data = nhefs_complete_uc,
-  weights = ~ wts)
+vars <- c("sex", "race", "age", "education", "smokeintensity", "smokeyrs", 
+          "exercise", "active", "wt71")
 
-smd_table_unweighted <- CreateTableOne(
-  vars = c("sex", "race", "age", "education", "smokeintensity", "smokeyrs", 
-           "exercise", "active", "wt71"),
-  strata = "qsmk",
-  data = nhefs_complete_uc,
-  test = FALSE)
-
-smd_table <- svyCreateTableOne(
-  vars = c("sex", "race", "age", "education", "smokeintensity", "smokeyrs", 
-           "exercise", "active", "wt71"),
-  strata = "qsmk",
-  data = svy_des,
-  test = FALSE)
-
-
-plot_df <- data.frame(
-  var = rownames(ExtractSmd(smd_table)),                        
-  Unadjusted = as.numeric(ExtractSmd(smd_table_unweighted)),                      
-  Weighted = as.numeric(ExtractSmd(smd_table))) %>%
-  pivot_longer(-var, names_to = "Method", values_to = "SMD")
+plot_df <- nhefs_complete_uc %>% 
+  summarise(
+    across(
+      all_of(vars), 
+      list(
+        unweighted = ~smd(.x, qsmk)$estimate, 
+        weighted = ~smd(.x, qsmk, wts)$estimate
+      )
+    )
+  ) %>% 
+  pivot_longer(
+    everything(), 
+    values_to = "SMD", 
+    names_to = c("variable", "Method"),
+    names_sep = "_"
+  )
 
 ggplot(
   data = plot_df,
-  mapping = aes(x = var, y = SMD, group = Method, color = Method)
+  aes(x = abs(SMD), y = variable, group = Method, color = Method)
 ) +
-  geom_line() +
+  geom_line(orientation = "y") +
   geom_point() + 
-  geom_hline(yintercept = 0.1, color = "black", size = 0.1) +  
-  coord_flip() +
-  theme_minimal()
-
+  geom_vline(xintercept = 0.1, color = "black", size = 0.1) +
+  theme_minimal() +
+  scale_color_manual(values = c("grey85", "#00BFC4")) +
+  xlim(0, .3)
 ```
 
 These look pretty good! Some variables are better than others, but weighting appears to have done a much better job eliminating these differences than an unadjusted analysis.
