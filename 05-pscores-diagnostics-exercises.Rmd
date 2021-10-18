@@ -6,9 +6,8 @@ output: html_document
 
 ```{r}
 library(tidyverse)
-library(survey)
-library(tableone)
 library(broom)
+library(smd)
 library(causaldata)
 ```
 
@@ -32,55 +31,44 @@ df <- propensity_model %>%
 
 _After updating the code chunks below, change `eval = TRUE` before knitting._
 
-Create the survey design object to incorporate the weights.
+Calculate the standardized mean differences with and without weights
 
-```{r, eval = TRUE}
-svy_des <- svydesign(
-  ids = ~ 1,
-  data = df,
-  weights = ~ w_ate
-)
+```{r, eval = FALSE}
+smds <- df %>% 
+  summarise(
+    across(
+      # variables to calculate SMD for
+      c(age, sex, wt71, smokeyrs), 
+      list(
+        unweighted = ~smd(.x, qsmk)$estimate, 
+        weighted = ~smd(.x, qsmk, w = w_ate)$estimate
+      )
+    )
+  )
 ```
 
-Create the **unweighted** standardized mean differences data frame
+Pivot `smds` so that it is in tidy format with the columns "SMD", "variable", and "Method".
 
-```{r, eval = TRUE}
-smd_table_unweighted <- CreateTableOne(
-  vars = c("age", "sex", "wt71", "smokeyrs"),
-  strata = "qsmk",
-  data = df,
-  test = FALSE)
-```
-
-Create the **weighted** standardized mean differences data frame
-
-```{r, eval = TRUE}
-smd_table <- svyCreateTableOne(
-  vars = c("age", "sex", "wt71", "smokeyrs"),
-  strata = "qsmk",
-  data = svy_des,
-  test = FALSE)
-```
-
-Create a data frame that merges `smd_table_unweighted` and `smd_table` and pivots it to prepare for plotting
-
-```{r, eval = TRUE}
-plot_df <- data.frame(
-  var = rownames(ExtractSmd(smd_table_unweighted)),                        
-  Unadjusted = as.numeric(ExtractSmd(smd_table_unweighted)),                      
-  Weighted = as.numeric(ExtractSmd(smd_table))) %>%
-  pivot_longer(-var, names_to = "Method", values_to = "SMD")
+```{r, eval = FALSE}
+plot_df <- smds %>% 
+  pivot_longer(
+    everything(), 
+    values_to = "SMD", 
+    names_to = c("variable", "Method"),
+    names_sep = "_"
+  )
 ```
 
 Create the Love Plot using ggplot
 
-```{r, eval = TRUE}
-ggplot(data = plot_df, 
-       mapping = aes(x = var, y = SMD, group = Method, color = Method)) +
-  geom_line() +
+```{r, eval = FALSE}
+ggplot(
+  data = plot_df,
+  aes(x = abs(SMD), y = variable, group = Method, color = Method)
+) +
+  geom_line(orientation = "y") +
   geom_point() + 
-  geom_hline(yintercept = 0.1, color = "black", size = 0.1) +  
-  coord_flip()
+  geom_vline(xintercept = 0.1, color = "black", size = 0.1)
 ```
 
 
