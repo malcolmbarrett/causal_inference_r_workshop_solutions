@@ -6,10 +6,8 @@ output: html_document
 
 ```{r}
 library(tidyverse)
-library(survey)
-library(tableone)
 library(broom)
-library(cidata)
+library(causaldata)
 library(rsample)
 ```
 
