@@ -7,8 +7,9 @@ output: html_document
 ```{r}
 library(tidyverse)
 library(broom)
-library(smd)
+library(tidysmd)
 library(causaldata)
+library(ggecdf)
 ```
 
 Using the National Health and Nutrition Examination Survey Data (`nhefs_complete`), we are interested in the relationship between the **exposure**, `qsmk`: whether the participant quit smoking, and the **outcome**, `wt82_71`: their weight change in kilograms.
@@ -34,37 +35,21 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 Calculate the standardized mean differences with and without weights
 
 ```{r, eval = FALSE}
-smds <- df %>% 
-  summarise(
-    across(
-      # variables to calculate SMD for
-      c(age, sex, wt71, smokeyrs), 
-      list(
-        unweighted = ~smd(.x, qsmk)$estimate, 
-        weighted = ~smd(.x, qsmk, w = w_ate)$estimate
-      )
-    )
-  )
+smds <- tidy_smd(
+  df, 
+  .vars = c(age, sex, wt71, smokeyrs),
+  .group = qsmk,
+  .wts = w_ate
+)
 ```
 
-Pivot `smds` so that it is in tidy format with the columns "SMD", "variable", and "Method".
-
-```{r, eval = FALSE}
-plot_df <- smds %>% 
-  pivot_longer(
-    everything(), 
-    values_to = "SMD", 
-    names_to = c("variable", "Method"),
-    names_sep = "_"
-  )
-```
 
 Create the Love Plot using ggplot
 
 ```{r, eval = FALSE}
 ggplot(
-  data = plot_df,
-  aes(x = abs(SMD), y = variable, group = Method, color = Method)
+  data = smds,
+  aes(x = abs(smd), y = variable, group = weights, color = weights)
 ) +
   geom_line(orientation = "y") +
   geom_point() + 
@@ -90,20 +75,11 @@ ggplot(df, aes(x = smokeyrs, group = qsmk, color = factor(qsmk))) +
 Create an weighted ECDF for `smokeyrs` by those who quit smoking and those who did not.
 
 ```{r, eval = TRUE}
-ecdf_1 <- df %>%
-  filter(qsmk == 1) %>%
-  arrange(smokeyrs) %>%
-  mutate(cum_pct = cumsum(w_ate) / sum(w_ate))
-
-ecdf_0 <- df %>%
-  filter(qsmk == 0) %>%
-  arrange(smokeyrs) %>%
-  mutate(cum_pct = cumsum(w_ate) / sum(w_ate))
-
-ggplot(ecdf_1, aes(x = smokeyrs, y = cum_pct)) +
-  geom_line(color = "#5DB854") +
-  geom_line(data = ecdf_0, aes(x = smokeyrs, y = cum_pct), color = "#5154B8") + 
-  xlab("Smoking Years") + 
-  ylab("Proportion <= x") 
+ggplot(df, aes(x = smokeyrs, color = factor(qsmk))) +
+  geom_ecdf(aes(weights = w_ate)) + 
+  scale_color_manual("Quit smoking", values = c("#5154B8", "#5DB854"),
+                     labels = c("Yes", "No")) +
+  xlab("Smoking Years") +
+  ylab("Proportion <= x (Weighted)")
 ```
 
