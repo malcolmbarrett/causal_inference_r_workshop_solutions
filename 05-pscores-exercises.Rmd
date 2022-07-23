@@ -3,54 +3,82 @@ title: "Propensity Scores"
 output: html_document
 ---
 
-
 ```{r}
 library(tidyverse)
 library(broom)
-library(causaldata)
+library(touringplans)
 library(ggdag)
 ```
 
-Using the National Health and Nutrition Examination Survey Data (`nhefs_complete`), we are interested in the relationship between the **exposure**, `qsmk`: whether the participant quit smoking, and the **outcome**, `wt82_71`: their weight change in kilograms.
+For Your Turn, we'll be looking at an example using Walt Disney World ride data from the touringplans package.
 
-Below is a proposed DAG of the relationship between 4 confounders: `sex`, `age`, `smokeyrs` and `wt71` and the exposure and outcome. 
+Historically, guests who stayed in a Walt Disney World resort hotel were able to access the park during "Extra Magic Hours" during which the park was closed to all other guests.
+These extra hours could be in the morning or evening.
+The Seven Dwarfs Mine Train is a ride at Walt Disney World's Magic Kingdom. Typically, each day Magic Kingdom may or may not be selected to have these "Extra Magic Hours".
 
-_Knit this document to see the DAG or refer to the slides_.
+We are interested in examining the relationship between whether there were "Extra Magic Hours" in the morning and the average wait time for the Seven Dwarfs Mine Train the same day between 9am and 10am.
+
+Below is a proposed DAG for this question.
+
+*Knit this document to see the DAG or refer to the slides*.
 
 ```{r}
 set.seed(1234)
-# set up DAG
-smk_wt_dag <- dagify(
-  # specify causes of quitting smoking and weight gain:
-  qsmk ~ sex + age + smokeyrs + wt71,
-  wt82_71 ~ sex + age + smokeyrs + wt71,
-  # specify causal question:
-  exposure = "qsmk", 
-  outcome = "wt82_71",
-  # set up labels:
-  # here, I'll use the same variable names as the data set, but I'll label them
-  # with clearer names
-  labels = c(
-    # causal question
-    "qsmk" = "quit\nsmoking (qsmk)",
-    "wt82_71" = "change in\nweight",
-    
-    # demographics
-    "age" = "age",
-    "sex" = "sex",
-    
-    # health
-    "wt71" = "baseline\nweight (wt71)",
-    
-    # smoking history
-    "smokeyrs" = "yrs of\nsmoking (smokeyrs)"
-  )
-) %>% 
-  tidy_dagitty()
+# set up DAG coordinates
+coord_dag <- list(
+  x = c(season = 0, close = 0, weather_wdwhigh = -1, x = 1, y = 2),
+  y = c(season = -1, close = 1, weather_wdwhigh = 0.25, x = 0, y = 0)
+)
 
-smk_wt_dag %>% 
-  ggdag(text = FALSE, use_labels = "label") 
+# nicer labels for the nodes
+labels <- c(
+  x = "Extra Magic Morning",
+  y = "Average wait",
+  season = "Ticket Season",
+  weather_wdwhigh = "Historic high temperature",
+  close = "Time park closed"
+)
+
+# visualize the dag
+dagify(
+  y ~ x + close + season + weather_wdwhigh,
+  x ~ weather_wdwhigh + close + season,
+  coords = coord_dag,
+  labels = labels
+) %>%
+  ggdag(use_labels = "label", text = FALSE) +
+  theme_void() +
+  scale_x_continuous(
+    limits = c(-1.25, 2.25), 
+    breaks = c(-1, 0, 1, 2), 
+    labels = c(
+      "\n(one year ago)", "\n(6 months ago)",
+      "\n(3 months ago)", "9am - 10am\n(Today)"
+    )
+  ) +
+  theme(axis.text.x = element_text())
 ```
+
+Here we are proposing that there are three confounders: the historic high temperature on the day, the time the park closed, and the ticket season: value, regular, or peak.
+
+We can build a propensity score model using the `seven_dwarfs_train_2018` data set from the touringplans package.
+Each row of this dataset contains information about the Seven Dwarfs Mine Train during a certain hour on a given day.
+First we need to subset the data to only include average wait times between 9 and 10 am.
+
+```{r}
+seven_dwarfs <- seven_dwarfs_train_2018 %>%
+  filter(hour == 9)
+```
+
+Here's a data dictionary of the variables we need in the `seven_dwarfs` data set:
+
+| Variable                       | Column in `seven_dwarfs` |
+|--------------------------------|--------------------------|
+| Posted Wait Time (outcome)     | `avg_spostmin`           |
+| Extra Magic Morning (exposure) | `extra_magic_morning`    |
+| Ticket Season                  | `wdw_ticket_season`      |
+| Closing Time                   | `close`                  |
+| Historic Temperature           | `weather_wdwhigh`        |
 
 ## Your Turn
 
@@ -60,28 +88,43 @@ Fit a propensity score model for `qsmk` using the above proposed confounders.
 
 ```{r, eval = TRUE}
 propensity_model <- glm(
-  qsmk ~ age + smokeyrs + sex + wt71,
-  data = nhefs_complete,
+  extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
+  data = seven_dwarfs,
   family = binomial()
 )
 ```
 
-Add the propensity scores to the `nhefs_complete` data set, call this new dataset `df`.
+Add the propensity scores to the `seven_dwarfs` data set, call this new dataset `df`.
 
 ```{r, eval = TRUE}
 df <- propensity_model %>%
-  augment(type.predict = "response", data = nhefs_complete)
+  augment(type.predict = "response", data = seven_dwarfs)
 ```
 
 
 Stretch Goal 1: 
 
-Examine two histograms of the propensity scores, one for those that quit smoking (`qsmk == 1`) and one for those that did not (`qsmk == 0`). How do these compare?
+Examine two histograms of the propensity scores, one days with Extra Magic Morning (`extra_magic_morning == 1`) and one for days without it (`extra_magic_morning == 0`).
+How do these compare?
 
 ```{r}
-ggplot(df, aes(x = .fitted, group = qsmk, fill = factor(qsmk))) +
-  geom_histogram(bins = 30) + 
-  labs(x = "Propensity Score",
-       fill = "Quit Smoking (0 = No, 1 = Yes)")
+ggplot() +
+    geom_histogram(
+        data = df %>% filter(extra_magic_morning == 1),
+        aes(x = .fitted),
+        fill = "orange",
+        bins = 40
+    ) +
+    geom_histogram(
+        data = df %>% filter(extra_magic_morning == 0),
+        aes(
+            x = .fitted,
+            y = -after_stat(count)
+        ),
+        fill = "cornflower blue",
+        bins = 40
+    ) +
+    scale_y_continuous("Count", labels = abs) +
+    scale_x_continuous("Propensity Score")
 ```
 
