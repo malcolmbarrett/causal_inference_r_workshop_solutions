@@ -1,0 +1,139 @@
+---
+title: "Whole Game 2: Malaria and Mosquito Nets"
+output: html_document
+---
+
+```{r setup}
+library(tidyverse)
+library(broom)
+library(rsample)
+library(ggdag)
+library(tipr)
+library(tidysmd)
+library(ggecdf)
+```
+
+## Whole Game 2: Malaria and Mosquito Nets
+
+In this exercise, we'll attempt to answer a causal question: does mosquito bed net use reduce malaria risk? 
+
+To answer this question, we'll use the causal inference methods we learned in this workshop. You may use any technique you prefer. If you have time, try more than one technique and compare the results. Remember the broad strokes we discussed today: 
+
+1. Specify causal question (we just did this!)
+2. Draw assumptions (via a causal diagram, which we'll do below)
+3. Model assumptions (e.g. with a propensity score)
+4. Analyze propensities (diagnostics)
+5. Estimate causal effects 
+6. Conduct a sensitivity analysis
+
+We'll use simulated data, `net_data`, from from {causalworkshop} package, which includes five variables: 
+* `id`: an ID variable
+* `income`: weekly income, measured in dollars
+* `health`: a health score scale ranging from 0–100
+* `net`: a binary variable indicating if the participant used a net (1) or didn't use a net (0)
+* `malria_risk`: a risk of malaria scale ranging from 0-100
+
+Our thanks to Andrew Heiss for providing these data!
+
+```{r}
+library(causalworkshop)
+net_data
+```
+
+Here's the DAG we are proposing. While this DAG is simple, make sure you confirm what the adjustment set is. 
+
+```{r}
+coords <- list(
+  x = c(mal = 4, net = 1, inc = 2, hlth = 3),
+  y = c(mal = 1, net = 1, inc = 2, hlth = 2)
+)
+
+mosquito_dag <- dagify(
+  mal ~ net + inc + hlth,
+  net ~ inc + hlth,
+  hlth ~ inc,
+  coords = coords,
+  exposure = "net",
+  outcome = "mal"
+)
+
+ggdag_status(mosquito_dag) +
+  guides(color = "none") +
+  theme_dag()
+```
+
+# Your Turn
+
+Now, conduct the causal analysis as you see fit! Feel free to work in groups and to ask us questions.
+
+```{r}
+propensity_model <- glm(net ~ income + health, data = net_data, family = binomial())
+
+df <- propensity_model |> 
+  augment(newdata = net_data) |> 
+  mutate(
+    w_ate = 1 / ifelse(net == 0, 1 - .fitted, .fitted),
+    w_atm = pmin(.fitted, 1 - .fitted) / 
+           (net * .fitted + (1 - net) * (1 - .fitted))
+  )
+
+smds <- tidy_smd(
+  df,
+  .vars = c(income, health),
+  .group = net,
+  .wts = starts_with("w_")
+)
+
+ggplot(
+  data = smds,
+  aes(x = abs(smd), y = variable, group = weights, color = weights)
+) +
+  geom_line(orientation = "y") +
+  geom_point() + 
+  geom_vline(xintercept = 0.1, color = "black", size = 0.1)
+
+ggplot(df, aes(x = income, color = as.factor(net))) +
+  geom_ecdf(aes(weights = w_ate))
+
+ggplot(df, aes(x = income, color = as.factor(net))) +
+  geom_ecdf(aes(weights = w_atm))
+
+lm(malaria_risk ~ net, weights = w_ate, data = df) |> 
+  tidy() |> 
+  filter(term == "net")
+
+lm(malaria_risk ~ net, weights = w_atm, data = df) |> 
+  tidy() |> 
+  filter(term == "net")
+```
+
+```{r}
+standardized_model <- lm(malaria_risk ~ net + income + health, data = net_data)
+
+yes <- mutate(net_data, net = 1)
+no <- mutate(net_data, net = 0)
+
+yes_net <- standardized_model |> 
+  augment(newdata = yes) |> 
+  select(id, yes_net = .fitted)
+
+no_net <- standardized_model |> 
+  augment(newdata = no) |> 
+  select(id, no_net = .fitted)
+
+yes_net |> 
+  left_join(no_net, by = "id") |> 
+  summarise(
+    mean_yes = mean(yes_net),
+    mean_no = mean(no_net),
+    difference = mean_yes - mean_no
+  )
+```
+
+```{r}
+tip_coef(10.5, .5)
+```
+
+
+
+
