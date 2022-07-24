@@ -69,8 +69,8 @@ Now, conduct the causal analysis as you see fit! Feel free to work in groups and
 ```{r}
 propensity_model <- glm(net ~ income + health, data = net_data, family = binomial())
 
-df <- propensity_model |> 
-  augment(newdata = net_data) |> 
+df <- propensity_model %>% 
+  augment(newdata = net_data, type.predict = "response") %>% 
   mutate(
     w_ate = 1 / ifelse(net == 0, 1 - .fitted, .fitted),
     w_atm = pmin(.fitted, 1 - .fitted) / 
@@ -98,12 +98,12 @@ ggplot(df, aes(x = income, color = as.factor(net))) +
 ggplot(df, aes(x = income, color = as.factor(net))) +
   geom_ecdf(aes(weights = w_atm))
 
-lm(malaria_risk ~ net, weights = w_ate, data = df) |> 
-  tidy() |> 
+lm(malaria_risk ~ net, weights = w_ate, data = df) %>% 
+  tidy() %>% 
   filter(term == "net")
 
-lm(malaria_risk ~ net, weights = w_atm, data = df) |> 
-  tidy() |> 
+lm(malaria_risk ~ net, weights = w_atm, data = df) %>% 
+  tidy() %>% 
   filter(term == "net")
 ```
 
@@ -113,16 +113,16 @@ standardized_model <- lm(malaria_risk ~ net + income + health, data = net_data)
 yes <- mutate(net_data, net = 1)
 no <- mutate(net_data, net = 0)
 
-yes_net <- standardized_model |> 
-  augment(newdata = yes) |> 
+yes_net <- standardized_model %>% 
+  augment(newdata = yes) %>% 
   select(id, yes_net = .fitted)
 
-no_net <- standardized_model |> 
-  augment(newdata = no) |> 
+no_net <- standardized_model %>% 
+  augment(newdata = no) %>% 
   select(id, no_net = .fitted)
 
-yes_net |> 
-  left_join(no_net, by = "id") |> 
+yes_net %>% 
+  left_join(no_net, by = "id") %>% 
   summarise(
     mean_yes = mean(yes_net),
     mean_no = mean(no_net),
