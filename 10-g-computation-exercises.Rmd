@@ -187,6 +187,9 @@ cens_model <- lm(
 3. Calculate the differences between the mean values of `kept_smoking` and `quit_smoking`
 
 ```{r}
+kept_smoking <- nhefs_complete %>% mutate(qsmk = 0)
+quit_smoking <- nhefs_complete %>% mutate(qsmk = 1)
+
 predicted_kept_smoking <- cens_model %>%
   augment(newdata = kept_smoking) %>%
   select(kept_smoking = .fitted)
