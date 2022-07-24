@@ -16,7 +16,7 @@ We are interested in examining the relationship between whether there were "Extr
 
 Below is the propensity score model and weights you created in the previous exercise.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 seven_dwarfs <- seven_dwarfs_train_2018 %>%
   filter(hour == 9)
 
@@ -37,7 +37,7 @@ _After updating the code chunks below, change `eval = TRUE` before knitting._
 
 Calculate the standardized mean differences with and without weights
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 smds <- df %>% 
   mutate(close = as.numeric(close)) %>% 
   tidy_smd(
@@ -50,7 +50,7 @@ smds <- df %>%
 
 Create the Love Plot using ggplot
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 ggplot(
   data = smds,
   aes(x = abs(smd), y = variable, group = weights, color = weights)

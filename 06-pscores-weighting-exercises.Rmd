@@ -15,7 +15,7 @@ We are interested in examining the relationship between whether there were "Extr
 
 Below is the propensity score model you created in the previous exercise.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 seven_dwarfs <- seven_dwarfs_train_2018 %>%
   filter(hour == 9)
 
