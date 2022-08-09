@@ -67,7 +67,7 @@ ggdag_status(mosquito_dag) +
 Now, conduct the causal analysis as you see fit! Feel free to work in groups and to ask us questions.
 
 ```{r}
-propensity_model <- glm(net ~ income + health, data = net_data, family = binomial())
+propensity_model <- glm(net ~ income + health + temperature, data = net_data, family = binomial())
 
 df <- propensity_model %>% 
   augment(newdata = net_data, type.predict = "response") %>% 
@@ -79,7 +79,7 @@ df <- propensity_model %>%
 
 smds <- tidy_smd(
   df,
-  .vars = c(income, health),
+  .vars = c(income, health, temperature),
   .group = net,
   .wts = starts_with("w_")
 )
@@ -95,23 +95,26 @@ ggplot(
 ggplot(df, aes(x = income, color = as.factor(net))) +
   geom_ecdf(aes(weights = w_ate))
 
-ggplot(df, aes(x = income, color = as.factor(net))) +
+ggplot(df, aes(x = health, color = as.factor(net))) +
+  geom_ecdf(aes(weights = w_atm))
+
+ggplot(df, aes(x = temperature, color = as.factor(net))) +
   geom_ecdf(aes(weights = w_atm))
 
 lm(malaria_risk ~ net, weights = w_ate, data = df) %>% 
   tidy() %>% 
-  filter(term == "net")
+  filter(term == "netTRUE")
 
 lm(malaria_risk ~ net, weights = w_atm, data = df) %>% 
   tidy() %>% 
-  filter(term == "net")
+  filter(term == "netTRUE")
 ```
 
 ```{r}
-standardized_model <- lm(malaria_risk ~ net + income + health, data = net_data)
+standardized_model <- lm(malaria_risk ~ net + income + health + temperature, data = net_data)
 
-yes <- mutate(net_data, net = 1)
-no <- mutate(net_data, net = 0)
+yes <- mutate(net_data, net = TRUE)
+no <- mutate(net_data, net = FALSE)
 
 yes_net <- standardized_model %>% 
   augment(newdata = yes) %>% 
@@ -131,7 +134,7 @@ yes_net %>%
 ```
 
 ```{r}
-tip_coef(10.5, .5)
+tip_coef(-9, .5)
 ```
 
 
