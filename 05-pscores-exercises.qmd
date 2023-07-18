@@ -1,6 +1,6 @@
 ---
 title: "Propensity Scores"
-output: html_document
+format: html
 ---
 
 ```{r}
@@ -45,7 +45,7 @@ dagify(
   x ~ weather_wdwhigh + close + season,
   coords = coord_dag,
   labels = labels
-) %>%
+) |>
   ggdag(use_labels = "label", text = FALSE) +
   theme_void() +
   scale_x_continuous(
@@ -66,7 +66,7 @@ Each row of this dataset contains information about the Seven Dwarfs Mine Train 
 First we need to subset the data to only include average wait times between 9 and 10 am.
 
 ```{r}
-seven_dwarfs <- seven_dwarfs_train_2018 %>%
+seven_dwarfs <- seven_dwarfs_train_2018 |>
   filter(hour == 9)
 ```
 
@@ -82,11 +82,12 @@ Here's a data dictionary of the variables we need in the `seven_dwarfs` data set
 
 ## Your Turn
 
-_After updating the code chunks below, change `eval = TRUE` before knitting._
+*After updating the code chunks below, change `eval = TRUE` before rendering.*
 
-Fit a propensity score model for `qsmk` using the above proposed confounders.
+Now, fit a propensity score model for `extra_magic_morning` using the above proposed confounders.
 
-```{r, eval = TRUE}
+```{r}
+#| eval: true
 propensity_model <- glm(
   extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
   data = seven_dwarfs,
@@ -96,35 +97,24 @@ propensity_model <- glm(
 
 Add the propensity scores to the `seven_dwarfs` data set, call this new dataset `df`.
 
-```{r, eval = TRUE}
-df <- propensity_model %>%
+```{r}
+#| eval: true
+df <- propensity_model |>
   augment(type.predict = "response", data = seven_dwarfs)
 ```
 
-
-Stretch Goal 1: 
+Stretch Goal 1:
 
 Examine two histograms of the propensity scores, one days with Extra Magic Morning (`extra_magic_morning == 1`) and one for days without it (`extra_magic_morning == 0`).
 How do these compare?
 
 ```{r}
-ggplot() +
-    geom_histogram(
-        data = df %>% filter(extra_magic_morning == 1),
-        aes(x = .fitted),
-        fill = "orange",
-        bins = 40
-    ) +
-    geom_histogram(
-        data = df %>% filter(extra_magic_morning == 0),
-        aes(
-            x = .fitted,
-            y = -after_stat(count)
-        ),
-        fill = "cornflower blue",
-        bins = 40
-    ) +
-    scale_y_continuous("Count", labels = abs) +
-    scale_x_continuous("Propensity Score")
+ggplot(
+  df, 
+  aes(x = .fitted, fill = factor(extra_magic_morning)
+  )) +
+  geom_histogram(bins = 30) +
+  scale_y_continuous("Count") +
+  scale_x_continuous("Propensity Score") +
+  scale_fill_manual(values = c("orange", "cornflower blue"))
 ```
-

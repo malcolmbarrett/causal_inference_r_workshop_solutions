@@ -1,14 +1,16 @@
 ---
 title: "The Parametric G-Formula"
-output: html_document
+format: html
 ---
 
-```{r setup}
+```{r}
+#| label: setup
 library(tidyverse)
 library(broom)
 library(touringplans)
+library(causaldata)
 
-seven_dwarfs <- seven_dwarfs_train_2018 %>%
+seven_dwarfs <- seven_dwarfs_train_2018 |>
   filter(hour == 9)
 ```
 
@@ -28,6 +30,7 @@ standardized_model <- lm(
 )
 ```
 
+
 # Your Turn 2
 
 Now that we've fit a model, we need to clone our data set. To do this, we'll simply mutate it so that in one set, all participants have `extra_magic_morning` set to 0 and in another, all participants have `extra_magic_morning` set to 1.
@@ -37,18 +40,18 @@ Now that we've fit a model, we need to clone our data set. To do this, we'll sim
 3. Save the predicted data sets as`predicted_yes` and `predicted_no`.
 
 ```{r}
-yes <- seven_dwarfs %>% 
-  mutate(extra_magic_morning = 0)
-
-no <- seven_dwarfs %>% 
+yes <- seven_dwarfs |>
   mutate(extra_magic_morning = 1)
 
-predicted_yes <- standardized_model %>% 
-  augment(newdata = yes) %>%
+no <- seven_dwarfs |>
+  mutate(extra_magic_morning = 0)
+
+predicted_yes <- standardized_model |>
+  augment(newdata = yes) |>
   select(yes_extra_hours = .fitted)
 
-predicted_no <- standardized_model %>% 
-  augment(newdata = no) %>%
+predicted_no <- standardized_model |>
+  augment(newdata = no) |>
   select(no_extra_hours = .fitted)
 ```
 
@@ -60,7 +63,7 @@ Finally, we'll get the mean differences between the values.
 2. Summarize the predicted values to create three new variables: `mean_yes`, `mean_no`, and `difference`. The first two should be the means of `yes_extra_hours` and `no_extra_hours`. `difference` should be `mean_yes` minus `mean_no`.
 
 ```{r}
-bind_cols(predicted_yes, predicted_no) %>%
+bind_cols(predicted_yes, predicted_no) |>
   summarize(
     mean_yes = mean(yes_extra_hours),
     mean_no = mean(no_extra_hours),
@@ -84,37 +87,37 @@ fit_gcomp <- function(split, ...) {
   
   # fit outcome model
   standardized_model <- lm(
-  avg_spostmin ~ extra_magic_morning + wdw_ticket_season + close + weather_wdwhigh, 
-  data = seven_dwarfs
-)
+    avg_spostmin ~ extra_magic_morning + wdw_ticket_season + close + weather_wdwhigh, 
+    data = seven_dwarfs
+  )
   
   # clone datasets
-  yes <- .df %>% 
-  mutate(extra_magic_morning = 0)
-
-no <- .df %>% 
-  mutate(extra_magic_morning = 1)
-
-predicted_yes <- standardized_model %>% 
-  augment(newdata = yes) %>%
-  select(yes_extra_hours = .fitted)
-
-predicted_no <- standardized_model %>% 
-  augment(newdata = no) %>%
-  select(no_extra_hours = .fitted)
+  yes <- .df |> 
+    mutate(extra_magic_morning = 0)
+  
+  no <- .df |> 
+    mutate(extra_magic_morning = 1)
+  
+  predicted_yes <- standardized_model |> 
+    augment(newdata = yes) |>
+    select(yes_extra_hours = .fitted)
+  
+  predicted_no <- standardized_model |> 
+    augment(newdata = no) |>
+    select(no_extra_hours = .fitted)
   
   # calculate ATE
-  bind_cols(predicted_yes, predicted_no) %>%
-  summarize(
-    mean_yes = mean(yes_extra_hours),
-    mean_no = mean(no_extra_hours),
-    difference = mean_yes - mean_no
-  ) %>% 
+  bind_cols(predicted_yes, predicted_no) |>
+    summarize(
+      mean_yes = mean(yes_extra_hours),
+      mean_no = mean(no_extra_hours),
+      difference = mean_yes - mean_no
+    ) |> 
     # rsample expects a `term` and `estimate` column
     pivot_longer(everything(), names_to = "term", values_to = "estimate")
 }
 
-gcomp_results <- bootstraps(seven_dwarfs, 1000, apparent = TRUE) %>% 
+gcomp_results <- bootstraps(seven_dwarfs, 1000, apparent = TRUE) |> 
   mutate(results = map(splits, fit_gcomp))
 
 # using bias-corrected confidence intervals
@@ -128,15 +131,14 @@ boot_estimate
 1. Take a look at how many participants were lost to follow up in `nhefs`, called `censored` in this data set. You don't need to change anything in this code.
 
 ```{r}
-library(causaldata)
-nhefs_censored <- nhefs %>%
+nhefs_censored <- nhefs |>
   drop_na(
     qsmk, sex, race, age, school, smokeintensity, smokeyrs, exercise,
     active, wt71
   )
 
-nhefs_censored %>% 
-  count(censored = as.factor(censored)) %>% 
+nhefs_censored |>
+  count(censored = as.factor(censored)) |>
   ggplot(aes(censored, n)) + 
   geom_col()
 ```
@@ -162,13 +164,14 @@ cens_model <- glm(
 4. Fit a linear regression model of `wt82_71` weighted by `cens_wts`. We'll use this model as the basis for our G-computation
 
 ```{r}
-cens <- cens_model %>%
-  augment(type.predict = "response", data = nhefs_censored) %>%
-  mutate(cens_wts = 1 / ifelse(censored == 0, 1 - .fitted, 1)) %>%
+library(propensity)
+cens <- cens_model |>
+  augment(type.predict = "response", data = nhefs_censored) |>
+  mutate(cens_wts = wt_ate(.fitted, censored)) |>
   select(id, cens_wts)
 
 #  join all the weights data from above
-nhefs_censored_wts <- nhefs_censored %>%
+nhefs_censored_wts <- nhefs_censored |>
   left_join(cens, by = "id")
 
 cens_model <- lm(
@@ -187,23 +190,18 @@ cens_model <- lm(
 3. Calculate the differences between the mean values of `kept_smoking` and `quit_smoking`
 
 ```{r}
-kept_smoking <- nhefs_complete %>% mutate(qsmk = 0)
-quit_smoking <- nhefs_complete %>% mutate(qsmk = 1)
-
-predicted_kept_smoking <- cens_model %>%
-  augment(newdata = kept_smoking) %>%
+predicted_kept_smoking <- cens_model |>
+  augment(newdata = nhefs_censored |> mutate(qsmk = 0)) |>
   select(kept_smoking = .fitted)
 
-predicted_quit_smoking <- cens_model %>%
-  augment(newdata = quit_smoking) %>%
+predicted_quit_smoking <- cens_model |>
+  augment(newdata = nhefs_censored |> mutate(qsmk = 1)) |>
   select(quit_smoking = .fitted)
 
 #  summarize the mean difference
-bind_cols(predicted_kept_smoking, predicted_quit_smoking) %>%
+bind_cols(predicted_kept_smoking, predicted_quit_smoking) |>
   summarise(
-    mean_quit_smoking = mean(kept_smoking),
-    mean_kept_smoking = mean(quit_smoking),
-    difference = mean_quit_smoking - mean_kept_smoking
+    est = mean(quit_smoking - kept_smoking)
   )
 ```
 
@@ -227,13 +225,13 @@ fit_gcomp_cens <- function(split, ...) {
     family = binomial()
   )
     # calculate the inverse probability of censoring weights. remember to predict `.df` instead of `nhefs_censored`
-  cens <- cens_model %>%
-    augment(type.predict = "response", data = .df) %>%
-    mutate(cens_wts = 1 / ifelse(censored == 0, 1 - .fitted, 1)) %>%
+  cens <- cens_model |>
+    augment(type.predict = "response", data = .df) |>
+    mutate(cens_wts = 1 / ifelse(censored == 0, 1 - .fitted, 1)) |>
     select(id, cens_wts)
   
   #  join all the weights data from above to .df
-  nhefs_censored_wts <- .df %>%
+  nhefs_censored_wts <- .df |>
     left_join(cens, by = "id")
   
   # fit outcome model. remember to model using `nhefs_censored_wts` instead of `nhefs_censored` or `.df`
@@ -246,33 +244,33 @@ fit_gcomp_cens <- function(split, ...) {
   )
   
   # clone datasets. remember to clone `.df` instead of `nhefs_censored`
-  kept_smoking <- .df %>% 
+  kept_smoking <- .df |> 
     mutate(qsmk = 0)
   
-  quit_smoking <- .df %>% 
+  quit_smoking <- .df |> 
     mutate(qsmk = 1)
   
   # predict change in weight for each cloned dataset
-  predicted_kept_smoking <- standardized_model %>% 
-    augment(newdata = kept_smoking) %>%
+  predicted_kept_smoking <- standardized_model |> 
+    augment(newdata = kept_smoking) |>
     select(kept_smoking = .fitted)
   
-  predicted_quit_smoking <- standardized_model %>% 
-    augment(newdata = quit_smoking) %>%
+  predicted_quit_smoking <- standardized_model |> 
+    augment(newdata = quit_smoking) |>
     select(quit_smoking = .fitted)
   
   # calculate ATE
-  bind_cols(predicted_kept_smoking, predicted_quit_smoking) %>% 
+  bind_cols(predicted_kept_smoking, predicted_quit_smoking) |> 
     summarize(
       mean_quit_smoking = mean(quit_smoking),
       mean_kept_smoking = mean(kept_smoking),
       difference = mean_quit_smoking - mean_kept_smoking
-    ) %>% 
+    ) |> 
     # rsample expects a `term` and `estimate` column
     pivot_longer(everything(), names_to = "term", values_to = "estimate")
 }
 
-gcomp_results <- bootstraps(nhefs_censored, 1000, apparent = TRUE) %>% 
+gcomp_results <- bootstraps(nhefs_censored, 1000, apparent = TRUE) |> 
   mutate(results = map(splits, fit_gcomp_cens))
 
 # using bias-corrected confidence intervals
