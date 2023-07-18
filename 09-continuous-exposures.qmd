@@ -1,9 +1,10 @@
 ---
 title: "Continuous exposures"
-output: html_document
+format: html
 ---
 
-```{r setup}
+```{r}
+#| label: setup
 library(tidyverse)
 library(broom)
 library(touringplans)
@@ -13,7 +14,10 @@ For this set of exercises, we'll use propensity scores for continuous exposures.
 
 In the touringplans data set, we have information about the posted waiting times for rides. We also have a limited amount of data on the observed, actual times. The question that we will consider is this: Do posted wait times (`avg_spostmin`) for the Seven Dwarves Mine Train at 8 am affect actual wait times (`avg_sactmin`) at 9 am? Here’s our DAG:
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
 library(ggdag)
 
 coord_dag <- list(
@@ -37,7 +41,7 @@ wait_time_dag <- dagify(
   labels = labels
 )
 
-wait_time_dag %>%
+wait_time_dag |>
   ggdag(use_labels = "label", text = FALSE) +
   theme_void() +
   scale_x_continuous(
@@ -53,16 +57,16 @@ First, let’s wrangle our data to address our question: do posted wait times at
 You don't need to update any code here, so just run this.
 
 ```{r}
-eight <- seven_dwarfs_train_2018 %>% 
-  filter(hour == 8) %>% 
+eight <- seven_dwarfs_train_2018 |>
+  filter(hour == 8) |>
   select(-avg_sactmin)
 
-nine <- seven_dwarfs_train_2018 %>% 
-  filter(hour == 9) %>% 
+nine <- seven_dwarfs_train_2018 |>
+  filter(hour == 9) |>
   select(date, avg_sactmin)
 
-wait_times <- eight %>% 
-  left_join(nine, by = "date") %>% 
+wait_times <- eight |>
+  left_join(nine, by = "date") |>
   drop_na(avg_sactmin)
 ```
 
@@ -80,13 +84,13 @@ denominator_model <- lm(
   data = wait_times
 )
 
-denominators <- denominator_model %>% 
-  augment(data = wait_times) %>% 
+denominators <- denominator_model |> 
+  augment(data = wait_times) |> 
   mutate(denominator = dnorm(
     avg_spostmin, 
     .fitted, 
     mean(.sigma, na.rm = TRUE)
-  )) %>% 
+  )) |> 
   select(date, denominator)
 ```
 
@@ -95,8 +99,8 @@ denominators <- denominator_model %>%
 As with the example in the slides, we have a lot of extreme values for our weights
 
 ```{r}
-denominators %>% 
-  mutate(wts = 1 / denominator) %>% 
+denominators |>
+  mutate(wts = 1 / denominator) |>
   ggplot(aes(wts)) +
   geom_density(col = "#E69F00", fill = "#E69F0095") + 
   scale_x_log10() + 
@@ -116,18 +120,20 @@ numerator_model <- lm(
   data = wait_times
 )
 
-numerators <- numerator_model %>% 
-  augment(data = wait_times) %>% 
-  mutate(numerator = dnorm(
-    avg_spostmin, 
-    .fitted, 
-    mean(.sigma, na.rm = TRUE)
-  )) %>% 
+numerators <- numerator_model |>
+  augment(data = wait_times) |>
+  mutate(
+    numerator = dnorm(
+      avg_spostmin, 
+      .fitted, 
+      mean(.sigma, na.rm = TRUE)
+    )
+  ) |>
   select(date, numerator)
 
-wait_times_wts <- wait_times %>% 
-  left_join(numerators, by = "date") %>% 
-  left_join(denominators, by = "date") %>% 
+wait_times_wts <- wait_times |>
+  left_join(numerators, by = "date") |>
+  left_join(denominators, by = "date") |>
   mutate(swts = numerator / denominator)
 ```
 
@@ -155,9 +161,9 @@ Now, let's fit the outcome model!
 1. Estimate the relationship between posted wait times and actual wait times using the stabilized weights we just created. 
 
 ```{r}
-lm(avg_sactmin ~ avg_spostmin, weights = swts, data = wait_times_wts) %>% 
-  tidy() %>% 
-  filter(term == "avg_spostmin") %>% 
+lm(avg_sactmin ~ avg_spostmin, weights = swts, data = wait_times_wts) |> 
+  tidy() |> 
+  filter(term == "avg_spostmin") |> 
   mutate(estimate = estimate * 10)
 ```
 
@@ -180,13 +186,13 @@ fit_model <- function(split, ...) {
     data = .df
   )
   
-  denominators <- denominator_model %>% 
-    augment(data = .df) %>% 
+  denominators <- denominator_model |> 
+    augment(data = .df) |> 
     mutate(denominator = dnorm(
       avg_spostmin, 
       .fitted, 
       mean(.sigma, na.rm = TRUE)
-    )) %>% 
+    )) |> 
     select(date, denominator)
   
   numerator_model <- lm(
@@ -194,33 +200,34 @@ fit_model <- function(split, ...) {
     data = .df
   )
   
-  numerators <- numerator_model %>% 
-    augment(data = .df) %>% 
+  numerators <- numerator_model |> 
+    augment(data = .df) |> 
     mutate(numerator = dnorm(
       avg_spostmin, 
       .fitted, 
       mean(.sigma, na.rm = TRUE)
-    )) %>% 
+    )) |> 
     select(date, numerator)
   
-  .df_wts <- .df %>% 
-    left_join(numerators, by = "date") %>% 
-    left_join(denominators, by = "date") %>% 
+  .df_wts <- .df |> 
+    left_join(numerators, by = "date") |> 
+    left_join(denominators, by = "date") |> 
     mutate(swts = numerator / denominator)
   
-  lm(avg_sactmin ~ avg_spostmin, weights = swts, data = .df_wts) %>% 
-    tidy() %>% 
-    filter(term == "avg_spostmin") %>% 
+  lm(avg_sactmin ~ avg_spostmin, weights = swts, data = .df_wts) |> 
+    tidy() |> 
+    filter(term == "avg_spostmin") |> 
     mutate(estimate = estimate * 10)
 }
 
-model_estimate <- bootstraps(wait_times, 1000, apparent = TRUE) %>% 
+model_estimate <- bootstraps(wait_times, 1000, apparent = TRUE) |> 
   mutate(results = map(splits, fit_model))
 
 # using bias-corrected confidence intervals
 boot_estimate <- int_bca(model_estimate, results, .fn = fit_model)
 
 boot_estimate
+
 ```
 
 ***

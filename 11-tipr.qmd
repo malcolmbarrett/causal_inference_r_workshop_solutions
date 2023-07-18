@@ -1,8 +1,7 @@
 ---
 title: "Tipping Point Sensitivity Analyses"
-output: html_document
+format: html
 ---
-
 
 ```{r}
 library(tipr)
@@ -15,6 +14,6 @@ We are interested in examining the relationship between whether there were "Extr
 Use the `tip_coef()` function to conduct a sensitivity analysis for the estimate from your previous exercises.
 
 ```{r}
-tip_coef(4.35, smd = 0.6)
+tip_coef(0.000890, exposure_confounder_effect = 0.6)
 ```
 

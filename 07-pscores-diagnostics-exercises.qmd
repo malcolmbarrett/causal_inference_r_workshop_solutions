@@ -1,0 +1,94 @@
+---
+title: "Propensity Score Diagnostics"
+format: html
+---
+
+
+```{r}
+library(tidyverse)
+library(broom)
+library(touringplans)
+library(halfmoon)
+library(propensity)
+```
+
+We are interested in examining the relationship between whether there were "Extra Magic Hours" in the morning (the **exposure**) and the average wait time for the Seven Dwarfs Mine Train the same day between 9am and 10am (the **outcome**).
+
+Below is the propensity score model and weights you created in the previous exercise.
+
+```{r}
+#| eval: false
+seven_dwarfs <- seven_dwarfs_train_2018 |>
+  filter(hour == 9)
+
+propensity_model <- glm(
+  extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
+  data = seven_dwarfs,
+  family = binomial()
+)
+
+seven_dwarfs_ps <- propensity_model |>
+  augment(type.predict = "response", data = seven_dwarfs) |>
+  mutate(w_ate = wt_ate(.fitted, extra_magic_morning))
+```
+
+## Your Turn 1
+
+_After updating the code chunks below, change `eval = TRUE` before rendering._
+
+Calculate the standardized mean differences with and without weights
+
+```{r}
+#| eval: false
+smds <- seven_dwarfs_ps |>
+  mutate(close = as.numeric(close)) |>
+  tidy_smd(
+    .vars = c(wdw_ticket_season, close, weather_wdwhigh),
+    .group = extra_magic_morning,
+    .wts = w_ate
+  )
+```
+
+Create the Love Plot using ggplot and halfmoon
+
+```{r}
+#| eval: false
+ggplot(
+  data = smds,
+  aes(x = abs(smd), y = variable, group = method, color = method)
+) +
+  geom_love()
+```
+
+## Your Turn 2
+
+Create an unweighted ECDF for `weather_wdwhigh` by whether or not the day had Extra Magic Hours.
+
+```{r}
+#| eval: false
+ggplot(seven_dwarfs_ps, aes(x = weather_wdwhigh, color = factor(extra_magic_morning))) +
+  geom_ecdf() +
+  scale_color_manual(
+    "Extra Magic Hours", 
+    values = c("#5154B8", "#5DB854"),
+    labels = c("Yes", "No")
+  ) + 
+  xlab("Historic Temperature") + 
+  ylab("Proportion <= x") 
+```
+
+Create an weighted ECDF for `weather_wdwhigh` by whether or not the day had Extra Magic Hours.
+
+```{r}
+#| eval: false
+ggplot(seven_dwarfs_ps, aes(x = weather_wdwhigh, color = factor(extra_magic_morning))) +
+  geom_ecdf(aes(weights = w_ate)) + 
+  scale_color_manual(
+    "Extra Magic Hours", 
+    values = c("#5154B8", "#5DB854"),
+    labels = c("Yes", "No")
+  ) + 
+  xlab("Historic Temperature") + 
+  ylab("Proportion <= x") 
+```
+

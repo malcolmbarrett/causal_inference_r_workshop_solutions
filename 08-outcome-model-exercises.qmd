@@ -1,6 +1,6 @@
 ---
 title: "Outcome Model"
-output: html_document
+format: html
 ---
 
 
@@ -9,8 +9,9 @@ library(tidyverse)
 library(broom)
 library(touringplans)
 library(rsample)
+library(propensity)
 
-seven_dwarfs <- seven_dwarfs_train_2018 %>%
+seven_dwarfs <- seven_dwarfs_train_2018 |>
   filter(hour == 9)
 ```
 
@@ -18,9 +19,12 @@ We are interested in examining the relationship between whether there were "Extr
 
 ## Your turn
 
+_After updating the code chunks below, change `eval = TRUE` before rendering._
+
 Create a function called `ipw_fit` that fits the propensity score model from Exercise 03, incorporates the ATE weights calculated in Exercise 04, and fits a weighted outcome model.
 
-```{r, eval = TRUE}
+```{r}
+#| eval: false
 fit_ipw <- function(split, ...) { 
   .df <- analysis(split)
   
@@ -30,32 +34,59 @@ fit_ipw <- function(split, ...) {
     data = .df,
     family = binomial()
   )
+  
   # calculate ATE weights
-  
-  df <- propensity_model %>%
-  augment(type.predict = "response", data = .df) %>%
-  mutate(w_ate = 1 / ifelse(extra_magic_morning == 0, 1 - .fitted, .fitted))
-  
+  .df <- propensity_model |>
+    augment(type.predict = "response", data = .df) |> 
+    mutate(w_ate = wt_ate(.fitted, extra_magic_morning))
+
   # fit correctly bootstrapped ipw model 
-  lm(avg_spostmin ~ extra_magic_morning, data = df, weights = w_ate) %>% 
+  lm(avg_spostmin ~ extra_magic_morning, data = .df, weights = w_ate) |>
     tidy() 
 }
 ```
 
 Bootstrap this result 1000 times.
 
-```{r, eval = TRUE}
-ipw_results <- bootstraps(seven_dwarfs, 1000, apparent = TRUE) %>% 
+```{r}
+#| eval: false
+set.seed(1234)
+
+ipw_results <- bootstraps(seven_dwarfs, 1000, apparent = TRUE)
+
+ipw_results <- ipw_results |>
   mutate(results = map(splits, fit_ipw)) 
+```
+
+
+Bonus! 
+
+```{r}
+ipw_results |>
+  mutate(
+    estimate = map_dbl(
+      results,
+      # pull the `estimate` for `extra_magic_morning` for each fit
+      \(.fit) .fit |>
+        filter(term == "extra_magic_morning") |>
+        pull(estimate)
+    )
+  ) |>
+  ggplot(aes(estimate)) +
+  geom_histogram(fill = "#D55E00FF", color = "white", alpha = 0.8)
+
 ```
 
 
 Calculate the confidence interval
 
-```{r, eval = TRUE}
-boot_estimate <- int_t(ipw_results, results) %>%
+```{r}
+#| eval: false
+boot_estimate <- int_t(ipw_results, results) |>
   filter(term == "extra_magic_morning")
 ```
+
+
 
 
 Stretch goal: Do the same for a model using matching.
