@@ -5,6 +5,7 @@ format: html
 
 
 ```{r}
+#| label: setup
 library(tidyverse)
 library(broom)
 library(touringplans)
@@ -19,12 +20,12 @@ We are interested in examining the relationship between whether there were "Extr
 
 ## Your turn
 
-_After updating the code chunks below, change `eval = TRUE` before rendering._
+*After updating the code chunks below, change `eval: true` before rendering*
 
 Create a function called `ipw_fit` that fits the propensity score model from Exercise 03, incorporates the ATE weights calculated in Exercise 04, and fits a weighted outcome model.
 
 ```{r}
-#| eval: false
+#| eval: true
 fit_ipw <- function(split, ...) { 
   .df <- analysis(split)
   
@@ -38,7 +39,7 @@ fit_ipw <- function(split, ...) {
   # calculate ATE weights
   .df <- propensity_model |>
     augment(type.predict = "response", data = .df) |> 
-    mutate(w_ate = wt_ate(.fitted, extra_magic_morning))
+    mutate(w_ate = wt_ate(.fitted, extra_magic_morning, exposure_type = "binary"))
 
   # fit correctly bootstrapped ipw model 
   lm(avg_spostmin ~ extra_magic_morning, data = .df, weights = w_ate) |>
@@ -49,23 +50,23 @@ fit_ipw <- function(split, ...) {
 Bootstrap this result 1000 times.
 
 ```{r}
-#| eval: false
+#| eval: true
 set.seed(1234)
 
 ipw_results <- bootstraps(seven_dwarfs, 1000, apparent = TRUE)
 
 ipw_results <- ipw_results |>
-  mutate(results = map(splits, fit_ipw)) 
+  mutate(boot_fits = map(splits, fit_ipw)) 
 ```
 
-
-Bonus! 
+Check out the distribution of estimates (**no need to change this code**)
 
 ```{r}
+#| eval: true
 ipw_results |>
   mutate(
     estimate = map_dbl(
-      results,
+      boot_fits,
       # pull the `estimate` for `extra_magic_morning` for each fit
       \(.fit) .fit |>
         filter(term == "extra_magic_morning") |>
@@ -73,20 +74,19 @@ ipw_results |>
     )
   ) |>
   ggplot(aes(estimate)) +
-  geom_histogram(fill = "#D55E00FF", color = "white", alpha = 0.8)
-
+  geom_histogram(fill = "#D55E00FF", color = "white", alpha = 0.8) + 
+  theme_minimal()
 ```
-
 
 Calculate the confidence interval
 
 ```{r}
-#| eval: false
-boot_estimate <- int_t(ipw_results, results) |>
+#| eval: true
+boot_estimate <- int_t(ipw_results, boot_fits) |>
   filter(term == "extra_magic_morning")
+
+boot_estimate
 ```
-
-
 
 
 Stretch goal: Do the same for a model using matching.
