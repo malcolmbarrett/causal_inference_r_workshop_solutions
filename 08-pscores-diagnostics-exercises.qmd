@@ -5,6 +5,7 @@ format: html
 
 
 ```{r}
+#| label: setup
 library(tidyverse)
 library(broom)
 library(touringplans)
@@ -17,7 +18,6 @@ We are interested in examining the relationship between whether there were "Extr
 Below is the propensity score model and weights you created in the previous exercise.
 
 ```{r}
-#| eval: false
 seven_dwarfs <- seven_dwarfs_train_2018 |>
   filter(hour == 9)
 
@@ -34,12 +34,11 @@ seven_dwarfs_ps <- propensity_model |>
 
 ## Your Turn 1
 
-_After updating the code chunks below, change `eval = TRUE` before rendering._
+*After updating the code chunks below, change `eval: true` before rendering*
 
 Calculate the standardized mean differences with and without weights
 
 ```{r}
-#| eval: false
 smds <- seven_dwarfs_ps |>
   mutate(close = as.numeric(close)) |>
   tidy_smd(
@@ -52,7 +51,7 @@ smds <- seven_dwarfs_ps |>
 Create the Love Plot using ggplot and halfmoon
 
 ```{r}
-#| eval: false
+#| eval: true
 ggplot(
   data = smds,
   aes(x = abs(smd), y = variable, group = method, color = method)
@@ -65,7 +64,7 @@ ggplot(
 Create an unweighted ECDF for `weather_wdwhigh` by whether or not the day had Extra Magic Hours.
 
 ```{r}
-#| eval: false
+#| eval: true
 ggplot(seven_dwarfs_ps, aes(x = weather_wdwhigh, color = factor(extra_magic_morning))) +
   geom_ecdf() +
   scale_color_manual(
@@ -80,7 +79,7 @@ ggplot(seven_dwarfs_ps, aes(x = weather_wdwhigh, color = factor(extra_magic_morn
 Create an weighted ECDF for `weather_wdwhigh` by whether or not the day had Extra Magic Hours.
 
 ```{r}
-#| eval: false
+#| eval: true
 ggplot(seven_dwarfs_ps, aes(x = weather_wdwhigh, color = factor(extra_magic_morning))) +
   geom_ecdf(aes(weights = w_ate)) + 
   scale_color_manual(
