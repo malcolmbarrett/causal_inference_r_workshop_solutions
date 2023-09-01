@@ -93,18 +93,18 @@ First we need to subset the data to only include average wait times between 9 an
 
 ```{r}
 seven_dwarfs <- seven_dwarfs_train_2018 |>
-  filter(hour == 9)
+  filter(wait_hour == 9)
 ```
 
 Here's a data dictionary of the variables we need in the `seven_dwarfs` data set:
 
 | Variable                       | Column in `seven_dwarfs` |
 |--------------------------------|--------------------------|
-| Posted Wait Time (outcome)     | `avg_spostmin`           |
-| Extra Magic Morning (exposure) | `extra_magic_morning`    |
-| Ticket Season                  | `wdw_ticket_season`      |
-| Closing Time                   | `close`                  |
-| Historic Temperature           | `weather_wdwhigh`        |
+| Posted Wait Time (outcome)     | `wait_minutes_posted_avg`           |
+| Extra Magic Morning (exposure) | `park_magic_morning`    |
+| Ticket Season                  | `park_ticket_season`      |
+| Closing Time                   | `park_close`                  |
+| Historic Temperature           | `park_temperature_high`        |
 
 ## Your Turn
 
@@ -115,7 +115,7 @@ Now, fit a propensity score model for `extra_magic_morning` using the above prop
 ```{r}
 #| eval: true
 propensity_model <- glm(
-  extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
+  park_extra_magic_morning ~ park_ticket_season + park_close + park_temperature_high,
   data = seven_dwarfs,
   family = binomial()
 )
@@ -131,13 +131,13 @@ df <- propensity_model |>
 
 Stretch Goal 1:
 
-Examine two histograms of the propensity scores, one days with Extra Magic Morning (`extra_magic_morning == 1`) and one for days without it (`extra_magic_morning == 0`).
+Examine two histograms of the propensity scores, one days with Extra Magic Morning (`park_extra_magic_morning == 1`) and one for days without it (`park_extra_magic_morning == 0`).
 How do these compare?
 
 ```{r}
 ggplot(
   df, 
-  aes(x = .fitted, fill = factor(extra_magic_morning))
+  aes(x = .fitted, fill = factor(park_extra_magic_morning))
 ) +
   geom_histogram(bins = 30) +
   scale_y_continuous("Count") +
