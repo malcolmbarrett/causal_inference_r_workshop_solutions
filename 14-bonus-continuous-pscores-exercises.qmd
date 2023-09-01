@@ -89,36 +89,36 @@ You don't need to update any code here, so just run this.
 
 ```{r}
 eight <- seven_dwarfs_train_2018 |>
-  filter(hour == 8) |>
-  select(-avg_sactmin)
+  filter(wait_hour == 8) |>
+  select(-wait_minutes_actual_avg)
 
 nine <- seven_dwarfs_train_2018 |>
-  filter(hour == 9) |>
-  select(date, avg_sactmin)
+  filter(wait_hour == 9) |>
+  select(park_date, wait_minutes_actual_avg)
 
 wait_times <- eight |>
-  left_join(nine, by = "date") |>
-  drop_na(avg_sactmin)
+  left_join(nine, by = "park_date") |>
+  drop_na(wait_minutes_actual_avg)
 ```
 
 # Your Turn 1
 
-First, let’s calculate the propensity score model, which will be the denominator in our stabilized weights (more to come on that soon). We’ll fit a model using `lm()` for `avg_spostmin` with our covariates, then use the fitted predictions of `avg_spostmin` (`.fitted`, `.sigma`) to calculate the density using `dnorm()`.
+First, let’s calculate the propensity score model, which will be the denominator in our stabilized weights (more to come on that soon). We’ll fit a model using `lm()` for `wait_minutes_posted_avg` with our covariates, then use the fitted predictions of `avg_spostmin` (`.fitted`, `.sigma`) to calculate the density using `dnorm()`.
 
-1. Fit a model using `lm()` with `avg_spostmin` as the outcome and the confounders identified in the DAG.
+1. Fit a model using `lm()` with `wait_minutes_posted_avg` as the outcome and the confounders identified in the DAG.
 2. Use `augment()` to add model predictions to the data frame.
 3. In `wt_ate()`, calculate the weights using `avg_postmin`, `.fitted`, and `.sigma`.
 
 ```{r}
 post_time_model <- lm(
-  avg_spostmin ~ close + extra_magic_morning + weather_wdwhigh + wdw_ticket_season, 
+  wait_minutes_posted_avg ~ park_close + park_extra_magic_morning + park_temperature_high + park_ticket_season, 
   data = wait_times
 )
 
 wait_times_wts <- post_time_model |>
   augment(data = wait_times) |>
   mutate(wts = wt_ate(
-    avg_spostmin, .fitted, .sigma = .sigma
+    wait_minutes_posted_avg, .fitted, .sigma = .sigma
   ))
 ```
 
@@ -143,7 +143,7 @@ Let’s now fit the marginal density to use for stabilized weights:
 wait_times_swts <- post_time_model |>
   augment(data = wait_times) |>
     mutate(swts = wt_ate(
-    avg_spostmin, 
+    wait_minutes_posted_avg, 
     .fitted,
     .sigma = .sigma,
     stabilize = TRUE
@@ -167,9 +167,9 @@ Now, let's fit the outcome model!
 1. Estimate the relationship between posted wait times and actual wait times using the stabilized weights we just created. 
 
 ```{r}
-lm(avg_sactmin ~ avg_spostmin, weights = swts, data = wait_times_swts) |>
+lm(wait_minutes_actual_avg ~ wait_minutes_posted_avg, weights = swts, data = wait_times_swts) |>
   tidy() |>
-  filter(term == "avg_spostmin") |>
+  filter(term == "wait_minutes_posted_avg") |>
   mutate(estimate = estimate * 10)
 ```
 
@@ -189,22 +189,22 @@ fit_model <- function(split, ...) {
   # fill in the rest!
   
   post_time_model <- lm(
-  avg_spostmin ~ close + extra_magic_morning + weather_wdwhigh + wdw_ticket_season, 
+  wait_minutes_posted_avg ~ park_close + park_extra_magic_morning + park_temperature_high + park_ticket_season, 
   data = .df
 )
   
   .df_swts <- post_time_model |>
   augment(data = .df) |>
     mutate(swts = wt_ate(
-    avg_spostmin, 
+    wait_minutes_posted_avg, 
     .fitted,
     .sigma = .sigma,
     stabilize = TRUE
   ))
   
-  lm(avg_sactmin ~ avg_spostmin, weights = swts, data = .df_swts) |>
+  lm(wait_minutes_actual_avg ~ wait_minutes_posted_avg, weights = swts, data = .df_swts) |>
   tidy() |>
-  filter(term == "avg_spostmin") |>
+  filter(term == "wait_minutes_posted_avg") |>
   mutate(estimate = estimate * 10)
 }
 
