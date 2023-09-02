@@ -18,10 +18,10 @@ Below is the propensity score model you created in the previous exercise.
 
 ```{r}
 seven_dwarfs <- seven_dwarfs_train_2018 |>
-  filter(hour == 9)
+  filter(wait_hour == 9)
 
 propensity_model <- glm(
-  extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
+  park_extra_magic_morning ~ park_ticket_season + park_close + park_temperature_high,
   data = seven_dwarfs,
   family = binomial()
 )
@@ -40,7 +40,7 @@ Create at "matched" data set using the same propensity score model as above and 
 #| eval: true
 library(MatchIt)
 matched_dwarfs <-  matchit(
-  extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
+  park_extra_magic_morning ~ park_ticket_season + park_close + park_temperature_high,
   data = seven_dwarfs,
   link = "linear.logit",
   caliper = 0.2
@@ -58,7 +58,7 @@ Add the ATE weights to the data frame, `seven_dwarfs_prop`
 ```{r}
 #| eval: true
 seven_dwarfs_prop <- seven_dwarfs_prop |>
-  mutate(w_ate = wt_ate(.fitted, extra_magic_morning))
+  mutate(w_ate = wt_ate(.fitted, park_extra_magic_morning))
 ```
 
 
@@ -69,7 +69,7 @@ Add ATM weights to the data frame, `seven_dwarfs_prop`
 ```{r}
 #| eval: true
 seven_dwarfs_prop <- seven_dwarfs_prop |>
-  mutate(w_atm = wt_atm(.fitted, extra_magic_morning))
+  mutate(w_atm = wt_atm(.fitted, park_extra_magic_morning))
 ```
 
 Stretch Goal 2: 
@@ -83,7 +83,7 @@ Update the code below to examine the distribution of the weighted sample. **HINT
 library(halfmoon)
 ggplot(
   seven_dwarfs_prop, 
-  aes(.fitted, fill = factor(extra_magic_morning))
+  aes(.fitted, fill = factor(park_extra_magic_morning))
 ) +
   geom_mirror_histogram(bins = 50, alpha = .5) +
   geom_mirror_histogram(aes(weight = w_ate), alpha = .5, bins = 50) +

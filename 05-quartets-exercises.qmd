@@ -5,6 +5,7 @@ format: html
 
 ```{r}
 #| label: setup
+library(tidyverse)
 library(quartets)
 ```
 
@@ -30,7 +31,7 @@ For each of the above 4 datasets, create a scatterplot looking at the relationsh
 causal_quartet |> 
   ggplot(aes(exposure, outcome)) + 
   geom_point() + 
-  geom_smooth(method = "lm") + 
+  geom_smooth(method = "lm", formula = "y ~ x") + 
   facet_wrap(~ dataset)
 ```
 

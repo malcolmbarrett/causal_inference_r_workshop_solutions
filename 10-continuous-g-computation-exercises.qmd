@@ -9,6 +9,9 @@ library(tidyverse)
 library(broom)
 library(touringplans)
 library(splines)
+
+seven_dwarfs <- seven_dwarfs_train_2018 |>
+  filter(wait_hour == 9)
 ```
 
 For this set of exercises, we'll use g-computation to calculate a causal effect for continuous exposures.
@@ -89,23 +92,23 @@ You don't need to update any code here, so just run this.
 
 ```{r}
 eight <- seven_dwarfs_train_2018 |>
-  filter(hour == 8) |>
-  select(-avg_sactmin)
+  filter(wait_hour == 8) |>
+  select(-wait_minutes_actual_avg)
 
 nine <- seven_dwarfs_train_2018 |>
-  filter(hour == 9) |>
-  select(date, avg_sactmin)
+  filter(wait_hour == 9) |>
+  select(park_date, wait_minutes_actual_avg)
 
 wait_times <- eight |>
-  left_join(nine, by = "date") |>
-  drop_na(avg_sactmin)
+  left_join(nine, by = "park_date") |>
+  drop_na(wait_minutes_actual_avg)
 ```
 
 # Your Turn 1
 
-For the parametric G-formula, we'll use a single model to fit a causal model of Posted Waiting Times (`avg_spostmin`) on Actual Waiting Times (`avg_sactmin`) where we  include all covariates, much as we normally fit regression models. However, instead of interpreting the coefficients, we'll calculate the estimate by predicting on cloned data sets.
+For the parametric G-formula, we'll use a single model to fit a causal model of Posted Waiting Times (`wait_minutes_posted_avg`) on Actual Waiting Times (`wait_minutes_actual_avg`) where we  include all covariates, much as we normally fit regression models. However, instead of interpreting the coefficients, we'll calculate the estimate by predicting on cloned data sets.
 
-Two additional differences in our model: we'll use a natural cubic spline on the exposure, `avg_spostmin`, using `ns()` from the splines package, and we'll include an interaction term between `avg_spostmin` and `extra_magic_mornin g`. These complicate the interpretation of the coefficient of the model in normal regression but have virtually no downside (as long as we have a reasonable sample size) in g-computation, because we still get an easily interpretable result.
+Two additional differences in our model: we'll use a natural cubic spline on the exposure, `wait_minutes_posted_avg`, using `ns()` from the splines package, and we'll include an interaction term between `wait_minutes_posted_avg` and `park_extra_magic_morning`. These complicate the interpretation of the coefficient of the model in normal regression but have virtually no downside (as long as we have a reasonable sample size) in g-computation, because we still get an easily interpretable result.
 
 First, let's fit the model. 
 
@@ -114,14 +117,14 @@ First, let's fit the model.
 
 ```{r}
 standardized_model <-  lm(
-  avg_sactmin ~ ns(avg_spostmin, df = 5)*extra_magic_morning + weather_wdwhigh + wdw_ticket_season + close, 
+  wait_minutes_actual_avg ~ ns(wait_minutes_posted_avg, df = 5)*park_extra_magic_morning + park_temperature_high + park_ticket_season + park_close, 
   data = seven_dwarfs
 )
 ```
 
 # Your Turn 2
 
-Now that we've fit a model, we need to clone our data set. To do this, we'll simply mutate it so that in one set, all participants have `avg_spostmin` set to 30 minutes and in another, all participants have `avg_spostmin` set to 60 minutes. 
+Now that we've fit a model, we need to clone our data set. To do this, we'll simply mutate it so that in one set, all participants have `wait_minutes_posted_avg` set to 30 minutes and in another, all participants have `wait_minutes_posted_avg` set to 60 minutes. 
 
 1. Create the cloned data sets, called `thirty` and `sixty`.
 2. For both data sets, use `standardized_model` and `augment()` to get the predicted values. Use the `newdata` argument in `augment()` with the relevant cloned data set. Then, select only the fitted value. Rename `.fitted` to either `thirty_posted_minutes` or `sixty_posted_minutes` (use the pattern `select(new_name = old_name)`).
@@ -129,10 +132,10 @@ Now that we've fit a model, we need to clone our data set. To do this, we'll sim
 
 ```{r}
 thirty <- seven_dwarfs |>
-  mutate(avg_spostmin = 30)
+  mutate(wait_minutes_posted_avg = 30)
 
 sixty <- seven_dwarfs |>
-  mutate(avg_spostmin = 60)
+  mutate(wait_minutes_posted_avg = 60)
 
 predicted_thirty <- standardized_model |>
   augment(newdata = thirty) |>
@@ -176,16 +179,16 @@ fit_gcomp <- function(split, ...) {
   
   # fit outcome model. remember to model using `.df` instead of `seven_dwarfs`
   standardized_model <-  lm(
-    avg_sactmin ~ ns(avg_spostmin, df = 5)*extra_magic_morning + weather_wdwhigh + wdw_ticket_season + close, 
+    wait_minutes_actual_avg ~ ns(wait_minutes_posted_avg, df = 5)*park_extra_magic_morning + park_temperature_high + park_ticket_season + park_close, 
     data = .df
   )
   
   # clone datasets. remember to clone `.df` instead of `seven_dwarfs`
   thirty <- .df |>
-    mutate(avg_spostmin = 30)
+    mutate(wait_minutes_posted_avg = 30)
   
   sixty <- .df |>
-    mutate(avg_spostmin = 60)
+    mutate(wait_minutes_posted_avg = 60)
   
   # predict actual wait time for each cloned dataset
   predicted_thirty <- standardized_model |>

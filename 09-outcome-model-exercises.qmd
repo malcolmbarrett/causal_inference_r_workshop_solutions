@@ -13,7 +13,7 @@ library(rsample)
 library(propensity)
 
 seven_dwarfs <- seven_dwarfs_train_2018 |>
-  filter(hour == 9)
+  filter(wait_hour == 9)
 ```
 
 We are interested in examining the relationship between whether there were "Extra Magic Hours" in the morning (the **exposure**) and the average wait time for the Seven Dwarfs Mine Train the same day between 9am and 10am (the **outcome**).
@@ -31,7 +31,7 @@ fit_ipw <- function(split, ...) {
   
   # fit propensity score model
   propensity_model <- glm(
-    extra_magic_morning ~ wdw_ticket_season + close + weather_wdwhigh,
+    park_extra_magic_morning ~ park_ticket_season + park_close + park_temperature_high,
     data = .df,
     family = binomial()
   )
@@ -39,10 +39,10 @@ fit_ipw <- function(split, ...) {
   # calculate ATE weights
   .df <- propensity_model |>
     augment(type.predict = "response", data = .df) |> 
-    mutate(w_ate = wt_ate(.fitted, extra_magic_morning, exposure_type = "binary"))
+    mutate(w_ate = wt_ate(.fitted, park_extra_magic_morning, exposure_type = "binary"))
 
   # fit correctly bootstrapped ipw model 
-  lm(avg_spostmin ~ extra_magic_morning, data = .df, weights = w_ate) |>
+  lm(wait_minutes_posted_avg ~ park_extra_magic_morning, data = .df, weights = w_ate) |>
     tidy() 
 }
 ```
@@ -67,9 +67,9 @@ ipw_results |>
   mutate(
     estimate = map_dbl(
       boot_fits,
-      # pull the `estimate` for `extra_magic_morning` for each fit
+      # pull the `estimate` for `park_extra_magic_morning` for each fit
       \(.fit) .fit |>
-        filter(term == "extra_magic_morning") |>
+        filter(term == "park_extra_magic_morning") |>
         pull(estimate)
     )
   ) |>
@@ -83,7 +83,7 @@ Calculate the confidence interval
 ```{r}
 #| eval: true
 boot_estimate <- int_t(ipw_results, boot_fits) |>
-  filter(term == "extra_magic_morning")
+  filter(term == "park_extra_magic_morning")
 
 boot_estimate
 ```
