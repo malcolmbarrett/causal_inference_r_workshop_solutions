@@ -9,9 +9,6 @@ library(tidyverse)
 library(broom)
 library(touringplans)
 library(splines)
-
-seven_dwarfs <- seven_dwarfs_train_2018 |>
-  filter(wait_hour == 9)
 ```
 
 For this set of exercises, we'll use g-computation to calculate a causal effect for continuous exposures.
@@ -117,8 +114,8 @@ First, let's fit the model.
 
 ```{r}
 standardized_model <-  lm(
-  wait_minutes_actual_avg ~ ns(wait_minutes_posted_avg, df = 5)*park_extra_magic_morning + park_temperature_high + park_ticket_season + park_close, 
-  data = seven_dwarfs
+  wait_minutes_actual_avg ~ ns(wait_minutes_posted_avg, df = 2)*park_extra_magic_morning + park_temperature_high + park_ticket_season + park_close, 
+  data = wait_times
 )
 ```
 
@@ -131,10 +128,10 @@ Now that we've fit a model, we need to clone our data set. To do this, we'll sim
 3. Save the predicted data sets as`predicted_thirty` and `predicted_sixty`.
 
 ```{r}
-thirty <- seven_dwarfs |>
+thirty <- wait_times |>
   mutate(wait_minutes_posted_avg = 30)
 
-sixty <- seven_dwarfs |>
+sixty <- wait_times |>
   mutate(wait_minutes_posted_avg = 60)
 
 predicted_thirty <- standardized_model |>
@@ -177,13 +174,13 @@ library(rsample)
 fit_gcomp <- function(split, ...) { 
   .df <- analysis(split) 
   
-  # fit outcome model. remember to model using `.df` instead of `seven_dwarfs`
+  # fit outcome model. remember to model using `.df` instead of `wait_times`
   standardized_model <-  lm(
-    wait_minutes_actual_avg ~ ns(wait_minutes_posted_avg, df = 5)*park_extra_magic_morning + park_temperature_high + park_ticket_season + park_close, 
+    wait_minutes_actual_avg ~ ns(wait_minutes_posted_avg, df = 2)*park_extra_magic_morning + park_temperature_high + park_ticket_season + park_close, 
     data = .df
   )
   
-  # clone datasets. remember to clone `.df` instead of `seven_dwarfs`
+  # clone datasets. remember to clone `.df` instead of `wait_times`
   thirty <- .df |>
     mutate(wait_minutes_posted_avg = 30)
   
@@ -210,7 +207,7 @@ fit_gcomp <- function(split, ...) {
     pivot_longer(everything(), names_to = "term", values_to = "estimate")
 }
 
-gcomp_results <- bootstraps(seven_dwarfs, 1000, apparent = TRUE) |>
+gcomp_results <- bootstraps(wait_times, 1000, apparent = TRUE) |>
   mutate(results = map(splits, fit_gcomp))
 
 # using bias-corrected confidence intervals
