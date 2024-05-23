@@ -91,3 +91,24 @@ ggplot(seven_dwarfs_ps, aes(x = park_temperature_high, color = factor(park_extra
   ylab("Proportion <= x") 
 ```
 
+## Bonus Your Turn: Weighted Tables
+
+Create a weighted table for the seven dwarfs dataset given your weights
+
+
+```{r}
+library(survey)
+library(gtsummary)
+seven_dwarfs_ps |> 
+  select(park_extra_magic_morning, park_ticket_season, park_close, park_temperature_high, w_ate) |> 
+svydesign(
+  ids = ~ 1,
+  data = _,
+  weights = ~ w_ate
+) |> 
+  tbl_svysummary(
+    by = park_extra_magic_morning,
+    include = -w_ate
+  ) |>
+  add_difference(everything() ~ "smd") 
+```
