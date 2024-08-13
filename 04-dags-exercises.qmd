@@ -39,6 +39,7 @@ coffee_cancer_dag <- dagify(
 )
 
 ggdag(coffee_cancer_dag)
+ggdag_dconnected(coffee_cancer_dag)
 ```
 
 ## Your Turn 2
